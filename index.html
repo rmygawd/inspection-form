@@ -311,7 +311,7 @@
       }
     }
     
-    /********* PDF Generation with Improved Formatting for iOS *********/
+    /********* PDF Generation with Improved Formatting for iOS & Edge *********/
     function generatePDF() {
       const inspectorName  = document.querySelector('input[name="inspector"]').value;
       const inspectorPhone = document.querySelector('input[name="inspectorPhone"]').value;
@@ -319,6 +319,9 @@
 
       const container = document.querySelector('.container');
       const clone = container.cloneNode(true);
+
+      // Enforce container width for proper rendering
+      clone.style.width = container.offsetWidth + 'px';
 
       // Remove the submit button from the cloned version
       const submitButton = clone.querySelector('button[type="submit"]');
@@ -357,7 +360,8 @@
       clone.style.left = '-10000px';
       document.body.appendChild(clone);
 
-      html2canvas(clone, { scale: 2 }).then(canvas => {
+      // Use dynamic scale based on devicePixelRatio (or default to 2)
+      html2canvas(clone, { scale: window.devicePixelRatio || 2 }).then(canvas => {
         document.body.removeChild(clone);
         const imgData = canvas.toDataURL('image/png');
 
