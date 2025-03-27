@@ -311,7 +311,7 @@
       }
     }
     
-    /********* PDF Generation with Improved Formatting for iOS & Edge *********/
+    /********* PDF Generation with Improved Rendering for iOS & Edge *********/
     function generatePDF() {
       const inspectorName  = document.querySelector('input[name="inspector"]').value;
       const inspectorPhone = document.querySelector('input[name="inspectorPhone"]').value;
@@ -323,11 +323,11 @@
       // Enforce container width for proper rendering
       clone.style.width = container.offsetWidth + 'px';
 
-      // Instead of moving the clone offscreen, position it at top left with zero opacity so it remains fully rendered.
-      clone.style.position = 'absolute';
+      // Position the clone offscreen using fixed positioning with a negative z-index
+      clone.style.position = 'fixed';
       clone.style.top = '0';
       clone.style.left = '0';
-      clone.style.opacity = '0';
+      clone.style.zIndex = '-9999';
       
       // Remove the submit button from the cloned version
       const submitButton = clone.querySelector('button[type="submit"]');
@@ -361,78 +361,78 @@
       clone.querySelectorAll('.delete-button').forEach(el => el.remove());
       clone.querySelectorAll('button.add-item').forEach(el => el.remove());
 
-      // Append the clone to the body so html2canvas can capture it
+      // Append the clone to the body
       document.body.appendChild(clone);
 
-      // Use dynamic scale based on devicePixelRatio (or default to 2)
-      html2canvas(clone, { scale: window.devicePixelRatio || 2 }).then(canvas => {
-        document.body.removeChild(clone);
-        const imgData = canvas.toDataURL('image/png');
+      // Use a slight delay to ensure the clone is fully rendered before capturing
+      setTimeout(function() {
+        html2canvas(clone, { scale: window.devicePixelRatio || 2 }).then(canvas => {
+          document.body.removeChild(clone);
+          const imgData = canvas.toDataURL('image/png');
 
-        const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
+          const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
 
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgWidth = pdfWidth;
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+          const imgProps = pdf.getImageProperties(imgData);
+          const imgWidth = pdfWidth;
+          const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-        let heightLeft = imgHeight;
-        let position = 0;
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
+          let heightLeft = imgHeight;
+          let position = 0;
           pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
           heightLeft -= pdfHeight;
-        }
 
-        const totalPages = pdf.internal.getNumberOfPages();
-        pdf.setPage(totalPages);
-        pdf.setFontSize(10);
-        const footerText = `${inspectorName}\n${inspectorPhone}\n${inspectorEmail}\nhttps://gocitywide.com/`;
-        pdf.text(footerText, 10, pdfHeight - 20);
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
+          }
 
-        // Create a blob from the PDF data
-        const blob = pdf.output('blob');
-        const blobUrl = URL.createObjectURL(blob);
+          const totalPages = pdf.internal.getNumberOfPages();
+          pdf.setPage(totalPages);
+          pdf.setFontSize(10);
+          const footerText = `${inspectorName}\n${inspectorPhone}\n${inspectorEmail}\nhttps://gocitywide.com/`;
+          pdf.text(footerText, 10, pdfHeight - 20);
 
-        // If the Web Share API is available and supports files, use it
-        if (
-          navigator.share &&
-          navigator.canShare &&
-          navigator.canShare({ files: [new File([blob], 'inspection.pdf', { type: 'application/pdf' })] })
-        ) {
-          const file = new File([blob], 'inspection.pdf', { type: 'application/pdf' });
-          navigator.share({
-            title: 'Inspection PDF',
-            text: 'Please review the attached inspection PDF.',
-            files: [file]
-          }).catch(error => {
-            console.error('Error using the share API:', error);
-            // Fallback to anchor download if sharing fails
+          // Create a blob from the PDF data
+          const blob = pdf.output('blob');
+          const blobUrl = URL.createObjectURL(blob);
+
+          // Use the Web Share API if available, else fallback to anchor download
+          if (
+            navigator.share &&
+            navigator.canShare &&
+            navigator.canShare({ files: [new File([blob], 'inspection.pdf', { type: 'application/pdf' })] })
+          ) {
+            const file = new File([blob], 'inspection.pdf', { type: 'application/pdf' });
+            navigator.share({
+              title: 'Inspection PDF',
+              text: 'Please review the attached inspection PDF.',
+              files: [file]
+            }).catch(error => {
+              console.error('Error using the share API:', error);
+              const a = document.createElement('a');
+              a.href = blobUrl;
+              a.download = 'inspection.pdf';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            });
+          } else {
             const a = document.createElement('a');
             a.href = blobUrl;
             a.download = 'inspection.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-          });
-        } else {
-          // Fallback: create an anchor element to trigger download
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = 'inspection.pdf';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }
+          }
 
-        // Optionally, send the PDF via email
-        sendEmailWithPDF(pdf.output('datauristring'), inspectorName);
-      });
+          // Optionally, send the PDF via email
+          sendEmailWithPDF(pdf.output('datauristring'), inspectorName);
+        });
+      }, 100);
     }
     
     function sendEmailWithPDF(pdfDataUri, inspectorName) {
